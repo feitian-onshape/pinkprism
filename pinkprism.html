@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Three.js Flat vs Smooth with Custom Shaders</title>
+  <style>
+    body {
+      margin: 0;
+      background: #111;
+      color: #eee;
+      font-family: sans-serif;
+    }
+
+    canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: #000a;
+      padding: 10px;
+      border-radius: 6px;
+      z-index: 100;
+    }
+
+    #info {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #000a;
+      padding: 10px;
+      border-radius: 6px;
+      z-index: 100;
+      max-width: 400px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    #info h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: #4af;
+    }
+
+    #info .section {
+      margin-bottom: 10px;
+    }
+
+    #info .label {
+      color: #aaa;
+    }
+
+    #info .value {
+      color: #fff;
+      font-family: monospace;
+    }
+
+    label {
+      display: block;
+      margin-top: 4px;
+    }
+
+    .btn {
+      background: #333;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 6px;
+      font-size: 12px;
+    }
+
+    .btn:hover {
+      background: #444;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    #helpBtn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      padding: 0;
+      font-weight: bold;
+      font-size: 12px;
+    }
+
+    #dayNightBtn {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      padding: 0;
+      font-size: 14px;
+      line-height: 20px;
+    }
+
+    #helpModal {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: #222;
+      padding: 20px;
+      border-radius: 8px;
+      z-index: 1000;
+      max-width: 400px;
+      border: 1px solid #444;
+    }
+
+    #helpModal h3 {
+      margin: 0 0 10px 0;
+      color: #4af;
+    }
+
+    #helpModal ul {
+      margin: 10px 0;
+      padding-left: 20px;
+    }
+
+    #helpModal .close {
+      float: right;
+      cursor: pointer;
+      color: #888;
+    }
+
+    #helpModal .close:hover {
+      color: #fff;
+    }
+
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+
+    #raycastInfo {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      background: #000a;
+      padding: 10px;
+      border-radius: 6px;
+      z-index: 100;
+      max-width: 400px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    #raycastInfo h3,
+    #vertexInfo h3 {
+      margin: 0 0 8px 0;
+      font-size: 14px;
+      color: #4af;
+    }
+
+
+
+    body.day-mode {
+      background: #ddd;
+      color: #222;
+    }
+
+    body.day-mode #ui,
+    body.day-mode #info,
+    body.day-mode #raycastInfo {
+      background: rgba(255, 255, 255, 0.85) !important;
+      color: #222;
+    }
+
+    body.day-mode #info h3,
+    body.day-mode #raycastInfo h3,
+    body.day-mode #vertexInfo h3 {
+      color: #07a !important;
+    }
+
+    body.day-mode .label,
+    body.day-mode #info .label {
+      color: #666;
+    }
+
+    body.day-mode .value,
+    body.day-mode #info .value {
+      color: #222;
+    }
+
+    body.day-mode .btn {
+      background: #ccc;
+      color: #222;
+      border-color: #999;
+    }
+
+    body.day-mode .btn:hover {
+      background: #bbb;
+    }
+
+    .rc-label {
+      color: #aaa;
+    }
+
+    .rc-value {
+      color: #fff;
+      font-family: monospace;
+    }
+
+    body.day-mode .rc-label {
+      color: #666 !important;
+    }
+
+    body.day-mode .rc-value {
+      color: #222 !important;
+    }
+
+    body.day-mode #vertexInfo {
+      border-top-color: #ccc !important;
+    }
+
+    body.day-mode #helpModal {
+      background: #f5f5f5;
+      border-color: #ccc;
+      color: #222;
+    }
+
+    body.day-mode #helpModal h3 {
+      color: #07a;
+    }
+
+    body.day-mode #helpModal .close {
+      color: #666;
+    }
+
+    body.day-mode #helpModal .close:hover {
+      color: #222;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="ui">
+    <label>Shape
+      <select id="shape">
+        <option value="sphere">sphere</option>
+        <option value="cube">cube</option>
+        <option value="cylinder">cylinder</option>
+        <option value="torus">torus</option>
+        <option value="teapot.obj">teapot.obj</option>
+        <option value="bunny.obj">bunny.obj</option>
+        <option value="dragon.obj">dragon.obj</option>
+        <option value="lucy.obj">lucy.obj</option>
+        <option value="nefertiti.obj">nefertiti.obj</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="smooth"> Smooth normals</label>
+    <label><input type="checkbox" id="wire"> Wireframe</label>
+    <div class="btn-row">
+      <button class="btn" id="loadObjBtn">Load OBJ</button>
+      <button class="btn" id="dayNightBtn" title="Toggle Day/Night">🌙</button>
+      <button class="btn" id="helpBtn" title="Help">?</button>
+    </div>
+    <input type="file" id="objFileInput" accept=".obj" style="display:none;">
+  </div>
+
+  <div id="overlay"></div>
+  <div id="helpModal">
+    <span class="close">&times;</span>
+    <h3>Help</h3>
+    <ul>
+      <li><b>Shape:</b> Select a built-in shape or OBJ model</li>
+      <li><b>Load OBJ:</b> Load your own .obj file</li>
+      <li><b>Smooth normals:</b> Toggle smooth/flat shading</li>
+      <li><b>Wireframe:</b> Show mesh wireframe</li>
+      <li><b>Day mode:</b> Toggle day/night theme</li>
+      <li><b>Click mesh:</b> Show triangle/vertex info</li>
+      <li><b>Drag:</b> Rotate camera (arcball)</li>
+      <li><b>Scroll:</b> Zoom in/out</li>
+    </ul>
+  </div>
+
+  <div id="info">
+    <h3>Model Information</h3>
+    <div class="section">
+      <div><span class="label">Vertices:</span> <span class="value" id="totalVertices">-</span></div>
+      <div><span class="label">Triangles:</span> <span class="value" id="totalTriangles">-</span></div>
+    </div>
+  </div>
+
+  <div id="raycastInfo" style="display:none;">
+    <h3>Triangle Hit</h3>
+    <div style="margin-bottom:10px;">
+      <div><span class="rc-label">Triangle Index:</span> <span class="rc-value" id="triIndex">-</span></div>
+      <div><span class="rc-label">Distance:</span> <span class="rc-value" id="distance">-</span></div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div><span class="rc-label">Vertex 1:</span> <span class="rc-value" id="v1">-</span></div>
+      <div><span class="rc-label">Vertex 2:</span> <span class="rc-value" id="v2">-</span></div>
+      <div><span class="rc-label">Vertex 3:</span> <span class="rc-value" id="v3">-</span></div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div><span class="rc-label">Normal:</span> <span class="rc-value" id="normal">-</span></div>
+      <div><span class="rc-label">Hit Point:</span> <span class="rc-value" id="hitPoint">-</span></div>
+    </div>
+    <div id="vertexInfo" style="display:none;">
+      <h3>Vertex Hit</h3>
+      <div style="margin-bottom:10px;">
+        <div><span class="rc-label">Vertex Index:</span> <span class="rc-value" id="vertexIndex">-</span></div>
+        <div><span class="rc-label">Position:</span> <span class="rc-value" id="vertexPos">-</span></div>
+        <div><span class="rc-label">Screen:</span> <span class="rc-value" id="vertexScreen">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+{
+  "imports": {
+    "three": "./dep/three.module.js",
+    "three/addons/": "./dep/"
+  }
+}
+</script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
+
+    /*================ CONFIGURATION =================*/
+    const CONFIG = {
+      defaultDayMode: false,  // Set to true for day mode, false for night mode
+      dayModeCanvasColor: 0xeeeeee,
+      nightModeCanvasColor: 0x121212
+    };
+
+    /*================ INDEXEDDB FOR OBJ CACHING =================*/
+
+    const DB_NAME = 'OBJCacheDB';
+    const DB_VERSION = 1;
+    const STORE_NAME = 'Gainsborough';
+    let db = null;
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          db = request.result;
+          resolve(db);
+        };
+        request.onupgradeneeded = (event) => {
+          const database = event.target.result;
+          if (!database.objectStoreNames.contains(STORE_NAME)) {
+            database.createObjectStore(STORE_NAME, { keyPath: 'uuid' });
+          }
+        };
+      });
+    }
+
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
+
+    async function saveOBJToCache(name, objData) {
+      const uuid = generateUUID();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        const record = { uuid, name, data: objData, timestamp: Date.now() };
+        const request = store.add(record);
+        request.onsuccess = () => resolve({ uuid, name });
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function getOBJFromCache(uuid) {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(uuid);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function getAllCachedOBJs() {
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_NAME], 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    // Map to track cached OBJ entries (uuid -> name)
+    const cachedOBJs = new Map();
+
+    function addOBJToDropdown(uuid, name) {
+      const shapeSelect = document.getElementById('shape');
+      // Check if already exists
+      const existing = Array.from(shapeSelect.options).find(opt => opt.value === `cached:${uuid}`);
+      if (existing) return;
+      
+      const option = document.createElement('option');
+      option.value = `cached:${uuid}`;
+      option.textContent = `📁 ${name}`;
+      shapeSelect.appendChild(option);
+      cachedOBJs.set(uuid, name);
+    }
+
+    /*================ SHADERS (keeping original) =================*/
+
+    const vs = `
+varying vec3 vPos;
+varying vec3 vNrm;
+uniform int useSmooth;
+
+void main(){
+  vec4 vp = modelViewMatrix * vec4(position, 1.0);
+  vPos = vp.xyz;
+  vNrm = (useSmooth == 1) ? (normalMatrix * normal) : vec3(0.0);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+    const fs = `
+varying vec3 vPos;
+varying vec3 vNrm;
+uniform int useSmooth;
+
+void main(){
+
+  if (!gl_FrontFacing) {
+            // Apply pink color to the back faces
+            // color = vec3(1.0, 0.7, 0.8); 
+            vec4 color = vec4(226.0/255.0,208.0/255.0,216.0/255.0, 1.0);
+            // color *= 0.1;
+
+            gl_FragColor = color;
+            return;
+  }
+
+  vec3 N;
+  if(useSmooth == 1){
+    N = normalize(vNrm);
+  }else{
+    vec3 dx = dFdx(vPos);
+    vec3 dy = dFdy(vPos);
+    N = normalize(cross(dx, dy));
+  }
+
+  vec3 V = normalize(-vPos);
+
+  // Light 1 - warm light from upper right
+  vec3 L1 = normalize(vec3(0.6, 1.0, 0.4));
+  vec3 H1 = normalize(L1 + V);
+  float diff1 = max(dot(N, L1), 0.0);
+  float spec1 = pow(max(dot(N, H1), 0.0), 64.0);
+
+  // Light 2 - cool light from left
+  vec3 L2 = normalize(vec3(-0.8, 0.3, 0.5));
+  vec3 H2 = normalize(L2 + V);
+  float diff2 = max(dot(N, L2), 0.0);
+  float spec2 = pow(max(dot(N, H2), 0.0), 64.0);
+
+  // Light 3 - rim light from behind
+  vec3 L3 = normalize(vec3(0.0, 0.5, -1.0));
+  vec3 H3 = normalize(L3 + V);
+  float diff3 = max(dot(N, L3), 0.0);
+  float spec3 = pow(max(dot(N, H3), 0.0), 64.0);
+
+  // Combine lights with different colors
+  vec3 color = vec3(0.1); // ambient
+
+  color += diff1 * vec3(0.7, 0.6, 0.5) + spec1 * vec3(1.0);       // warm white
+  color += diff2 * vec3(0.3, 0.4, 0.6) + spec2 * vec3(0.5, 0.6, 0.8); // cool blue
+  color += diff3 * vec3(0.4, 0.3, 0.5) + spec3 * vec3(0.6, 0.5, 0.7); // purple rim
+  gl_FragColor = vec4(color, 1.0);
+}`;
+
+    // Screen-space line shader - renders 2D UI line elements with pixel sizing
+    const screenLineVS = `
+uniform vec2 uScreenPos;     // Center position in NDC (-1 to 1)
+uniform float uSizePx;       // Size in pixels (uniform for both axes)
+uniform vec2 uResolution;    // Screen resolution in pixels
+
+void main() {
+  // Convert pixel size to NDC units with aspect correction
+  // Use height as reference to maintain aspect ratio
+  float aspect = uResolution.x / uResolution.y;
+  vec2 sizeNDC = vec2(uSizePx / uResolution.y * 2.0);
+  sizeNDC.x /= aspect;  // Correct for aspect ratio
+  
+  // position.xy are in range [-1, 1] for unit shape corners
+  vec2 offset = position.xy * sizeNDC;
+  vec2 screenPosition = uScreenPos + offset;
+  
+  gl_Position = vec4(screenPosition, 0.0, 1.0);
+}
+`;
+
+    const screenLineFS = `
+uniform vec3 uColor;
+uniform float uOpacity;
+
+void main() {
+  gl_FragColor = vec4(uColor, uOpacity);
+}
+`;
+
+    // Custom OBJ parser that preserves polygon edges before triangulation
+    function parseOBJWithPolygonEdges(objText) {
+      const vertices = [];
+      const edgeVertices = [];  // For polygon edge lines
+      const triangleVertices = [];  // For tessellated triangles
+
+      const lines = objText.split('\n');
+      const triangleIdnex = []
+
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length === 0) continue;
+
+        if (parts[0] === 'v') {
+          // Vertex position
+          vertices.push([
+            parseFloat(parts[1]),
+            parseFloat(parts[2]),
+            parseFloat(parts[3])
+          ]);
+        } else if (parts[0] === 'f') {
+          // Face - can be polygon with any number of vertices
+          const faceIndices = [];
+          for (let i = 1; i < parts.length; i++) {
+            // Handle formats: v, v/vt, v/vt/vn, v//vn
+            const idx = parseInt(parts[i].split('/')[0]) - 1; // OBJ is 1-indexed
+            if (!isNaN(idx)) faceIndices.push(idx);
+          }
+
+          if (faceIndices.length >= 3) {
+            // Extract polygon edges (original edges before triangulation)
+            for (let i = 0; i < faceIndices.length; i++) {
+              const v1 = vertices[faceIndices[i]];
+              const v2 = vertices[faceIndices[(i + 1) % faceIndices.length]];
+              if (v1 && v2) {
+                edgeVertices.push(v1[0], v1[1], v1[2]);
+                edgeVertices.push(v2[0], v2[1], v2[2]);
+              }
+            }
+
+            // Tessellate polygon into triangles using fan triangulation
+            const v0 = faceIndices[0];
+            for (let i = 1; i < faceIndices.length - 1; i++) {
+              const v1 = faceIndices[i];
+              const v2 = faceIndices[i + 1];
+
+              triangleIdnex.push(v0);
+              triangleIdnex.push(v1);
+              triangleIdnex.push(v2);
+            }
+          }
+        }
+      }
+
+      // Create mesh geometry (triangulated)
+      const meshGeometry = new THREE.BufferGeometry();
+      const vertexBuffer = new Float32Array(vertices.length * 3);
+      for (let i = 0; i < vertices.length; i++) {
+        vertexBuffer[i * 3 + 0] = vertices[i][0];
+        vertexBuffer[i * 3 + 1] = vertices[i][1];
+        vertexBuffer[i * 3 + 2] = vertices[i][2];
+      }
+      meshGeometry.setAttribute('position', new THREE.BufferAttribute(vertexBuffer, 3));
+      meshGeometry.setIndex(triangleIdnex);
+      meshGeometry.computeVertexNormals();
+
+      // Create edge geometry (original polygon edges)
+      const edgeGeometry = new THREE.BufferGeometry();
+      edgeGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(edgeVertices), 3));
+
+      return { meshGeometry, edgeGeometry, vertexCount: vertices.length, triangleCount: triangleIdnex.length / 3 };
+    }
+
+    // Pre-defined line geometries for UI elements
+    const UIShapes = {
+      // Rectangle: 4 line segments forming a square
+      rectangle: () => {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+          -1, -1, 0, 1, -1, 0,  // bottom
+          1, -1, 0, 1, 1, 0,  // right
+          1, 1, 0, -1, 1, 0,  // top
+          -1, 1, 0, -1, -1, 0   // left
+        ]), 3));
+        return geo;
+      },
+      // Equilateral triangle: 3 line segments
+      triangle: () => {
+        const geo = new THREE.BufferGeometry();
+        // Equilateral triangle vertices centered at origin
+        const h = Math.sqrt(3) / 2;  // height of equilateral triangle with side 2
+        const t1 = { x: 0, y: 3 / Math.sqrt(3) };           // top
+        const t2 = { x: -1, y: 0 };         // bottom left
+        const t3 = { x: 1, y: 0 };          // bottom right
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+          t1.x, t1.y, 0, t2.x, t2.y, 0,  // line 1
+          t2.x, t2.y, 0, t3.x, t3.y, 0,  // line 2
+          t3.x, t3.y, 0, t1.x, t1.y, 0   // line 3
+        ]), 3));
+        return geo;
+      }
+    };
+
+    // Factory function to create screen-space UI line element
+    function createScreenLineUI(shape, color, sizePx) {
+      const geometry = typeof shape === 'string' ? UIShapes[shape]() : shape;
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          uColor: { value: new THREE.Color(color) },
+          uOpacity: { value: 1.0 },
+          uScreenPos: { value: new THREE.Vector2() },
+          uSizePx: { value: sizePx },
+          uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+        },
+        vertexShader: screenLineVS,
+        fragmentShader: screenLineFS,
+        depthTest: false,
+        depthWrite: false,
+        transparent: true
+      });
+      const lines = new THREE.LineSegments(geometry, material);
+      lines.renderOrder = 1000;
+      return lines;
+    }
+
+    /*================ THREE.JS SETUP =================*/
+
+
+    /*================ RAYCASTER =================*/
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 6);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(CONFIG.defaultDayMode ? CONFIG.dayModeCanvasColor : CONFIG.nightModeCanvasColor);
+    document.body.appendChild(renderer.domElement);
+
+    /*================ CUSTOM SHADER MATERIAL =================*/
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vs,
+      fragmentShader: fs,
+      uniforms: {
+        useSmooth: { value: 0 }
+      },
+      polygonOffset: true,
+      polygonOffsetFactor: 1,
+      polygonOffsetUnits: 1,
+      transparent: true,
+      opacity: 0.3, 
+      side: THREE.DoubleSide
+    });
+
+    let mesh = null;
+    let wireframe = null;
+    let highlightMesh = null;
+    let vertexHighlight = null;
+    let vertexHighlightWorldPos = null;
+    let triangleHighlightWorldPos = null; // Store triangle center for dynamic updates
+    const vertexTolerancePx = 10; // pixel tolerance for vertex picking
+    const vertexHighlightSizePx = 4; // screen-space size in pixels for vertex highlight
+    const triangleHighlightSizePx = 4; // screen-space size in pixels for triangle highlight
+
+    /*================ SHAPES =================*/
+
+    const shapes = {
+      sphere: () => new THREE.SphereGeometry(1, 32, 32),
+      cube: () => new THREE.BoxGeometry(1.5, 1.5, 1.5),
+      cylinder: () => new THREE.CylinderGeometry(1, 1, 2, 32),
+      torus: () => new THREE.TorusGeometry(1, 0.4, 24, 48)
+    };
+
+    function updateModelInfo(geometry) {
+      const positionAttr = geometry.getAttribute('position');
+      const vertexCount = positionAttr ? positionAttr.count : 0;
+      const triangleCount = geometry.index ? geometry.index.count / 3 : vertexCount / 3;
+
+      document.getElementById('totalVertices').textContent = vertexCount.toLocaleString();
+      document.getElementById('totalTriangles').textContent = Math.floor(triangleCount).toLocaleString();
+    }
+
+    // Helper function to load and display OBJ text data
+    function loadOBJText(objText) {
+      // Clear existing mesh
+      if (mesh) scene.remove(mesh);
+      if (wireframe) scene.remove(wireframe);
+      if (highlightMesh) { scene.remove(highlightMesh); highlightMesh = null; }
+      if (vertexHighlight) { scene.remove(vertexHighlight); vertexHighlight = null; }
+      document.getElementById('raycastInfo').style.display = 'none';
+
+      // Use custom parser to preserve polygon edges
+      const { meshGeometry, edgeGeometry } = parseOBJWithPolygonEdges(objText);
+
+      // Center and scale geometry
+      meshGeometry.computeBoundingBox();
+      const box = meshGeometry.boundingBox;
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 2.0 / maxDim;
+
+      meshGeometry.translate(-center.x, -center.y, -center.z);
+      meshGeometry.scale(scale, scale, scale);
+      meshGeometry.computeVertexNormals();
+
+      edgeGeometry.translate(-center.x, -center.y, -center.z);
+      edgeGeometry.scale(scale, scale, scale);
+
+      mesh = new THREE.Mesh(meshGeometry, material);
+      scene.add(mesh);
+
+      // Use original polygon edges for wireframe
+      const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+      wireframe = new THREE.LineSegments(edgeGeometry, edgesMaterial);
+      wireframe.visible = document.getElementById('wire').checked;
+      scene.add(wireframe);
+
+      updateModelInfo(meshGeometry);
+      resetCamera();
+    }
+
+    function setShape(shapeName) {
+      if (mesh) scene.remove(mesh);
+      if (wireframe) scene.remove(wireframe);
+      if (highlightMesh) {
+        scene.remove(highlightMesh);
+        highlightMesh = null;
+      }
+      if (vertexHighlight) {
+        scene.remove(vertexHighlight);
+        vertexHighlight = null;
+      }
+      const vinfo = document.getElementById('vertexInfo');
+      if (vinfo) vinfo.style.display = 'none';
+
+      // Hide raycast info when changing shape
+      document.getElementById('raycastInfo').style.display = 'none';
+
+      // Check if it's a cached OBJ (from IndexedDB)
+      if (shapeName.startsWith('cached:')) {
+        const uuid = shapeName.replace('cached:', '');
+        getOBJFromCache(uuid).then(record => {
+          if (!record) {
+            console.error('Cached OBJ not found:', uuid);
+            return;
+          }
+          loadOBJText(record.data);
+        }).catch(err => console.error('Error loading cached OBJ:', err));
+        return;
+      }
+
+      // Check if it's an OBJ file (from server)
+      if (shapeName.endsWith('.obj')) {
+        fetch('models/' + shapeName)
+          .then(response => response.text())
+          .then(objText => {
+            const { meshGeometry, edgeGeometry, vertexCount, triangleCount } = parseOBJWithPolygonEdges(objText);
+
+            // Compute bounding box to center and scale
+            meshGeometry.computeBoundingBox();
+            const box = meshGeometry.boundingBox;
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 2.0 / maxDim;
+
+            // Center and scale both geometries
+            meshGeometry.translate(-center.x, -center.y, -center.z);
+            meshGeometry.scale(scale, scale, scale);
+            meshGeometry.computeVertexNormals();
+
+            edgeGeometry.translate(-center.x, -center.y, -center.z);
+            edgeGeometry.scale(scale, scale, scale);
+
+            mesh = new THREE.Mesh(meshGeometry, material);
+            scene.add(mesh);
+
+            // Use original polygon edges for wireframe
+            const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+            wireframe = new THREE.LineSegments(edgeGeometry, edgesMaterial);
+            wireframe.visible = document.getElementById('wire').checked;
+            scene.add(wireframe);
+
+            updateModelInfo(meshGeometry);
+          })
+          .catch(error => {
+            console.error('Error loading OBJ:', error);
+          });
+      } else {
+        const geometry = shapes[shapeName]();
+
+        mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        // Create edge geometry from triangles
+        const edgesGeometry = new THREE.EdgesGeometry(geometry, 1); // 1 degree threshold
+        const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        wireframe = new THREE.LineSegments(edgesGeometry, edgesMaterial);
+        wireframe.visible = document.getElementById('wire').checked;
+        scene.add(wireframe);
+
+        updateModelInfo(geometry);
+      }
+    }
+
+    setShape('teapot.obj');
+
+    /*================ ARCBALL CONTROLS =================*/
+
+    const controls = new ArcballControls(camera, renderer.domElement, scene);
+    controls.setGizmosVisible(false);
+    controls.enableAnimations = true;
+    controls.dampingFactor = 25;
+    controls.wMax = 20;
+    controls.setGizmosVisible(true);
+
+    function resetCamera() {
+      controls.reset();
+    }
+
+    /*============ RAYCASTING INTERACTION =================*/
+
+    function onMouseClick(event) {
+      // Calculate mouse position in normalized device coordinates
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+      // Update the picking ray with the camera and mouse position
+      raycaster.setFromCamera(mouse, camera);
+
+      if (!mesh) return;
+
+      // Calculate objects intersecting the picking ray
+      const intersects = raycaster.intersectObject(mesh);
+
+      if (intersects.length > 0) {
+        const hit = intersects[0];
+        const geometry = mesh.geometry;
+        const positionAttr = geometry.getAttribute('position');
+        const indexAttr = geometry.index;
+
+        // Get triangle face index
+        const faceIndex = hit.faceIndex;
+
+        // Get the three vertices of the triangle
+        let v1Index, v2Index, v3Index;
+        if (indexAttr) {
+          v1Index = indexAttr.getX(faceIndex * 3);
+          v2Index = indexAttr.getX(faceIndex * 3 + 1);
+          v3Index = indexAttr.getX(faceIndex * 3 + 2);
+        } else {
+          v1Index = faceIndex * 3;
+          v2Index = faceIndex * 3 + 1;
+          v3Index = faceIndex * 3 + 2;
+        }
+
+        const v1 = new THREE.Vector3().fromBufferAttribute(positionAttr, v1Index);
+        const v2 = new THREE.Vector3().fromBufferAttribute(positionAttr, v2Index);
+        const v3 = new THREE.Vector3().fromBufferAttribute(positionAttr, v3Index);
+
+        // Compute screen-space positions of vertices
+        const w1 = mesh.localToWorld(v1.clone());
+        const w2 = mesh.localToWorld(v2.clone());
+        const w3 = mesh.localToWorld(v3.clone());
+        const ndc1 = w1.clone().project(camera);
+        const ndc2 = w2.clone().project(camera);
+        const ndc3 = w3.clone().project(camera);
+        const s1 = { x: (ndc1.x * 0.5 + 0.5) * window.innerWidth, y: (-ndc1.y * 0.5 + 0.5) * window.innerHeight };
+        const s2 = { x: (ndc2.x * 0.5 + 0.5) * window.innerWidth, y: (-ndc2.y * 0.5 + 0.5) * window.innerHeight };
+        const s3 = { x: (ndc3.x * 0.5 + 0.5) * window.innerWidth, y: (-ndc3.y * 0.5 + 0.5) * window.innerHeight };
+
+        const mx = event.clientX, my = event.clientY;
+        const d1 = Math.hypot(s1.x - mx, s1.y - my);
+        const d2 = Math.hypot(s2.x - mx, s2.y - my);
+        const d3 = Math.hypot(s3.x - mx, s3.y - my);
+        const minD = Math.min(d1, d2, d3);
+        let nearestIndex = v1Index, nearestPos = v1, nearestScreen = s1;
+        if (minD === d2) { nearestIndex = v2Index; nearestPos = v2; nearestScreen = s2; }
+        if (minD === d3) { nearestIndex = v3Index; nearestPos = v3; nearestScreen = s3; }
+
+        // Remove previous highlights
+        if (highlightMesh) {
+          scene.remove(highlightMesh);
+          highlightMesh = null;
+        }
+        if (vertexHighlight) {
+          scene.remove(vertexHighlight);
+          vertexHighlight = null;
+        }
+
+        // If near a vertex within tolerance, show vertex info and 3D highlight
+        if (minD <= vertexTolerancePx) {
+          // Store world position for dynamic size updates in render loop
+          vertexHighlightWorldPos = mesh.localToWorld(nearestPos.clone());
+
+          // Create rectangle UI element for vertex highlight
+          vertexHighlight = createScreenLineUI('rectangle', 0x00ff00, vertexHighlightSizePx);
+          scene.add(vertexHighlight);
+
+          // Show vertex info - need to show raycastInfo container but vertex section only
+          document.getElementById('raycastInfo').style.display = 'block';
+          document.getElementById('vertexInfo').style.display = 'block';
+          document.getElementById('vertexIndex').textContent = nearestIndex;
+          document.getElementById('vertexPos').textContent = `(${nearestPos.x.toFixed(4)}, ${nearestPos.y.toFixed(4)}, ${nearestPos.z.toFixed(4)})`;
+          document.getElementById('vertexScreen').textContent = `(${Math.round(nearestScreen.x)}, ${Math.round(nearestScreen.y)})`;
+          // Hide triangle-specific elements
+          document.querySelector('#raycastInfo > h3').style.display = 'none';
+          document.querySelectorAll('#raycastInfo > div:not(#vertexInfo)').forEach(el => el.style.display = 'none');
+        } else {
+          // Show triangle info only when not hitting a vertex
+          document.getElementById('vertexInfo').style.display = 'none';
+
+          // Calculate triangle center in world space
+          const center = new THREE.Vector3().addVectors(v1, v2).add(v3).divideScalar(3);
+          triangleHighlightWorldPos = mesh.localToWorld(center.clone());
+
+          // Create equilateral triangle UI element for triangle highlight
+          highlightMesh = createScreenLineUI('triangle', 0xff0000, triangleHighlightSizePx);
+          scene.add(highlightMesh);
+
+          // Display triangle information - restore visibility of triangle elements
+          document.getElementById('raycastInfo').style.display = 'block';
+          document.querySelector('#raycastInfo > h3').style.display = 'block';
+          document.querySelectorAll('#raycastInfo > div:not(#vertexInfo)').forEach(el => el.style.display = 'block');
+          document.getElementById('triIndex').textContent = faceIndex;
+          document.getElementById('distance').textContent = hit.distance.toFixed(4);
+
+          document.getElementById('v1').textContent = `(${v1.x.toFixed(4)}, ${v1.y.toFixed(4)}, ${v1.z.toFixed(4)})`;
+          document.getElementById('v2').textContent = `(${v2.x.toFixed(4)}, ${v2.y.toFixed(4)}, ${v2.z.toFixed(4)})`;
+          document.getElementById('v3').textContent = `(${v3.x.toFixed(4)}, ${v3.y.toFixed(4)}, ${v3.z.toFixed(4)})`;
+
+          document.getElementById('normal').textContent = `(${hit.face.normal.x.toFixed(4)}, ${hit.face.normal.y.toFixed(4)}, ${hit.face.normal.z.toFixed(4)})`;
+          document.getElementById('hitPoint').textContent = `(${hit.point.x.toFixed(4)}, ${hit.point.y.toFixed(4)}, ${hit.point.z.toFixed(4)})`;
+        }
+      } else {
+        // No hit - hide info and remove highlights
+        document.getElementById('raycastInfo').style.display = 'none';
+        document.getElementById('vertexInfo').style.display = 'none';
+        if (highlightMesh) {
+          scene.remove(highlightMesh);
+          highlightMesh = null;
+          triangleHighlightWorldPos = null;
+        }
+        if (vertexHighlight) {
+          scene.remove(vertexHighlight);
+          vertexHighlight = null;
+          vertexHighlightWorldPos = null;
+        }
+      }
+    }
+
+    window.addEventListener('click', onMouseClick, false);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    /*================ RENDER LOOP =================*/
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+
+      // Update vertex highlight screen position
+      if (vertexHighlight && vertexHighlightWorldPos) {
+        const uniforms = vertexHighlight.material.uniforms;
+        const ndc = vertexHighlightWorldPos.clone().project(camera);
+        uniforms.uScreenPos.value.set(ndc.x, ndc.y);
+        uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+      }
+
+      // Update triangle highlight screen position
+      if (highlightMesh && triangleHighlightWorldPos) {
+        const uniforms = highlightMesh.material.uniforms;
+        const ndc = triangleHighlightWorldPos.clone().project(camera);
+        uniforms.uScreenPos.value.set(ndc.x, ndc.y);
+        uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    /*================ UI =================*/
+
+    document.getElementById('shape').addEventListener('change', e => {
+      setShape(e.target.value);
+      resetCamera();
+    });
+
+    document.getElementById('smooth').addEventListener('change', e => {
+      material.uniforms.useSmooth.value = e.target.checked ? 1 : 0;
+    });
+
+    document.getElementById('wire').addEventListener('change', e => {
+      if (wireframe) wireframe.visible = e.target.checked;
+    });
+
+    // Day/Night mode toggle button
+    let isDayMode = CONFIG.defaultDayMode;
+    
+    // Initialize UI based on config
+    if (isDayMode) {
+      document.body.classList.add('day-mode');
+      document.getElementById('dayNightBtn').textContent = '☀️';
+    }
+    
+    document.getElementById('dayNightBtn').addEventListener('click', () => {
+      isDayMode = !isDayMode;
+      const btn = document.getElementById('dayNightBtn');
+      if (isDayMode) {
+        document.body.classList.add('day-mode');
+        renderer.setClearColor(CONFIG.dayModeCanvasColor);
+        btn.textContent = '☀️';
+      } else {
+        document.body.classList.remove('day-mode');
+        renderer.setClearColor(CONFIG.nightModeCanvasColor);
+        btn.textContent = '🌙';
+      }
+    });
+
+    // Load OBJ file button
+    document.getElementById('loadObjBtn').addEventListener('click', () => {
+      document.getElementById('objFileInput').click();
+    });
+
+    document.getElementById('objFileInput').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const contents = event.target.result;
+        const fileName = file.name;
+
+        // Clear existing mesh
+        if (mesh) scene.remove(mesh);
+        if (wireframe) scene.remove(wireframe);
+        if (highlightMesh) { scene.remove(highlightMesh); highlightMesh = null; }
+        if (vertexHighlight) { scene.remove(vertexHighlight); vertexHighlight = null; }
+        document.getElementById('raycastInfo').style.display = 'none';
+
+        // Use custom parser to preserve polygon edges
+        const { meshGeometry, edgeGeometry } = parseOBJWithPolygonEdges(contents);
+
+        // Center and scale geometry
+        meshGeometry.computeBoundingBox();
+        const box = meshGeometry.boundingBox;
+        const center = new THREE.Vector3();
+        box.getCenter(center);
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scale = 2.0 / maxDim;
+
+        meshGeometry.translate(-center.x, -center.y, -center.z);
+        meshGeometry.scale(scale, scale, scale);
+        meshGeometry.computeVertexNormals();
+
+        edgeGeometry.translate(-center.x, -center.y, -center.z);
+        edgeGeometry.scale(scale, scale, scale);
+
+        mesh = new THREE.Mesh(meshGeometry, material);
+        scene.add(mesh);
+
+        // Use original polygon edges for wireframe
+        const edgesMaterial = new THREE.LineBasicMaterial({ color: 0x000000 });
+        wireframe = new THREE.LineSegments(edgeGeometry, edgesMaterial);
+        wireframe.visible = document.getElementById('wire').checked;
+        scene.add(wireframe);
+
+        updateModelInfo(meshGeometry);
+        resetCamera();
+
+        // Save to IndexedDB and add to dropdown
+        try {
+          const { uuid, name } = await saveOBJToCache(fileName, contents);
+          addOBJToDropdown(uuid, name);
+          // Select the newly added item
+          document.getElementById('shape').value = `cached:${uuid}`;
+        } catch (err) {
+          console.error('Error saving OBJ to cache:', err);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = ''; // Reset for re-uploading same file
+    });
+
+    // Help modal
+    const helpModal = document.getElementById('helpModal');
+    const overlay = document.getElementById('overlay');
+
+    document.getElementById('helpBtn').addEventListener('click', () => {
+      helpModal.style.display = 'block';
+      overlay.style.display = 'block';
+    });
+
+    document.querySelector('#helpModal .close').addEventListener('click', () => {
+      helpModal.style.display = 'none';
+      overlay.style.display = 'none';
+    });
+
+    overlay.addEventListener('click', () => {
+      helpModal.style.display = 'none';
+      overlay.style.display = 'none';
+    });
+
+    // Initialize IndexedDB and restore cached OBJs
+    openDB().then(async () => {
+      const cachedItems = await getAllCachedOBJs();
+      cachedItems.forEach(item => {
+        addOBJToDropdown(item.uuid, item.name);
+      });
+      console.log(`Loaded ${cachedItems.length} cached OBJ(s) from Gainsborough store`);
+    }).catch(err => {
+      console.error('Failed to open IndexedDB:', err);
+    });
+  </script>
+</body>
+
+</html>
